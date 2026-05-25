@@ -7,8 +7,8 @@ Real-time customer support chat built with Next.js 15, Node.js, Socket.io, Postg
 ```
 support-chat/
 ├── apps/
-│   ├── client/     # Next.js 15 + TypeScript + Socket.io client
-│   └── server/     # Node.js + Express + Socket.io + Prisma
+│   ├── client/     
+│   └── server/    
 └── package.json    # Monorepo root with npm workspaces
 ```
 
