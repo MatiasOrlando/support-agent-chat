@@ -6,10 +6,9 @@ import { Send, CheckCircle, Menu, X, MessageSquare } from "lucide-react";
 import { getSocket } from "@/lib/socket";
 import { api } from "@/lib/api";
 import { Conversation, Message } from "@/lib/types";
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-}
+import { formatTime, relativeTime, dayLabel, startsNewDay, MAX_MESSAGE_LENGTH } from "@/lib/format";
+import { EmojiPicker } from "./EmojiPicker";
+import { playPing, showNotification, requestNotificationPermission, primeAudio } from "@/lib/notify";
 
 function shortId(id: string) {
   return id.slice(0, 8).toUpperCase();
@@ -39,6 +38,7 @@ export function AgentPanel() {
   });
 
   useEffect(() => {
+    requestNotificationPermission();
     socket.on("connect", () => {
       socket.emit("agent_online");
     });
@@ -55,6 +55,14 @@ export function AgentPanel() {
     socket.on("new_message", (message: Message) => {
       if (message.conversationId === activeIdRef.current) {
         setMessages((prev) => [...prev, message]);
+      }
+
+      const notViewing =
+        message.conversationId !== activeIdRef.current ||
+        (typeof document !== "undefined" && document.hidden);
+      if (message.role === "CUSTOMER" && notViewing) {
+        playPing();
+        showNotification(`New message · #${shortId(message.conversationId)}`, message.content);
       }
       qc.invalidateQueries({ queryKey: ["conversations"] });
     });
@@ -80,6 +88,7 @@ export function AgentPanel() {
   }, [messages, customerTyping]);
 
   async function openConversation(conv: Conversation) {
+    primeAudio(); 
     setActiveId(conv.id);
     setMessages([]);
     setCustomerTyping(false);
@@ -179,6 +188,9 @@ export function AgentPanel() {
                   <p className="text-xs text-zinc-400 truncate">
                     {conv.messages?.[0]?.content ?? "No messages yet"}
                   </p>
+                  <p className="text-[10px] text-zinc-300 mt-0.5">
+                    {relativeTime(conv.updatedAt)}
+                  </p>
                 </div>
               </button>
             ))
@@ -246,9 +258,16 @@ export function AgentPanel() {
       ) : (
         <>
           <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-3 bg-zinc-50">
-            {messages.map((msg) => (
+            {messages.map((msg, i) => (
+              <div key={msg.id} className="flex flex-col gap-3">
+              {startsNewDay(messages[i - 1]?.createdAt, msg.createdAt) && (
+                <div className="flex justify-center">
+                  <span className="text-[11px] text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded-full">
+                    {dayLabel(msg.createdAt)}
+                  </span>
+                </div>
+              )}
               <div
-                key={msg.id}
                 className={`flex gap-2 ${msg.role === "AGENT" ? "flex-row-reverse" : "flex-row"}`}
               >
                 {msg.role === "CUSTOMER" && (
@@ -268,6 +287,7 @@ export function AgentPanel() {
                     {msg.role === "AGENT" ? "You" : "Customer"} · {formatTime(msg.createdAt)}
                   </span>
                 </div>
+              </div>
               </div>
             ))}
 
@@ -296,15 +316,17 @@ export function AgentPanel() {
             </div>
           ) : (
             <div className="px-4 py-3 bg-white border-t border-zinc-100">
-              <div className="flex gap-2 items-end bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-2.5 focus-within:border-zinc-400 transition-colors">
+              <div className="flex gap-1 items-end bg-zinc-50 border border-zinc-200 rounded-2xl px-2.5 py-2.5 focus-within:border-zinc-400 transition-colors">
                 <textarea
-                  className="flex-1 bg-transparent text-sm resize-none outline-none placeholder-zinc-400 min-h-[24px] max-h-[120px] text-zinc-800"
+                  className="flex-1 bg-transparent text-sm resize-none outline-none placeholder-zinc-400 min-h-[24px] max-h-[120px] text-zinc-800 px-1.5"
                   placeholder="Reply to customer..."
                   value={input}
                   onChange={(e) => { setInput(e.target.value); handleTyping(); }}
                   onKeyDown={handleKeyDown}
+                  maxLength={MAX_MESSAGE_LENGTH}
                   rows={1}
                 />
+                <EmojiPicker onSelect={(emoji) => setInput((v) => v + emoji)} />
                 <button
                   onClick={sendMessage}
                   disabled={!input.trim()}
@@ -313,6 +335,13 @@ export function AgentPanel() {
                   <Send size={13} />
                 </button>
               </div>
+              {input.length > MAX_MESSAGE_LENGTH - 200 && (
+                <div className="text-right pr-1 mt-1">
+                  <span className={`text-[11px] ${input.length >= MAX_MESSAGE_LENGTH ? "text-red-500" : "text-zinc-400"}`}>
+                    {input.length}/{MAX_MESSAGE_LENGTH}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </>

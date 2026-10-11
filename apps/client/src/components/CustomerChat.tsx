@@ -5,10 +5,8 @@ import { Send, MessageCircle, ArrowLeft } from "lucide-react";
 import { getSocket } from "@/lib/socket";
 import { api } from "@/lib/api";
 import { Message } from "@/lib/types";
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-}
+import { formatTime, dayLabel, startsNewDay, MAX_MESSAGE_LENGTH } from "@/lib/format";
+import { EmojiPicker } from "./EmojiPicker";
 
 export function CustomerChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -150,9 +148,16 @@ export function CustomerChat() {
             Conversation started. An agent will join shortly.
           </p>
         )}
-        {messages.map((msg) => (
+        {messages.map((msg, i) => (
+          <div key={msg.id} className="flex flex-col gap-3">
+          {startsNewDay(messages[i - 1]?.createdAt, msg.createdAt) && (
+            <div className="flex justify-center">
+              <span className="text-[11px] text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded-full">
+                {dayLabel(msg.createdAt)}
+              </span>
+            </div>
+          )}
           <div
-            key={msg.id}
             className={`flex gap-2 ${msg.role === "CUSTOMER" ? "flex-row-reverse" : "flex-row"}`}
           >
             {msg.role === "AGENT" && (
@@ -172,6 +177,7 @@ export function CustomerChat() {
                 {formatTime(msg.createdAt)}
               </span>
             </div>
+          </div>
           </div>
         ))}
 
@@ -200,15 +206,17 @@ export function CustomerChat() {
         </div>
       ) : (
         <div className="px-4 py-3 bg-white border-t border-zinc-100">
-          <div className="flex gap-2 items-end bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-2.5 focus-within:border-zinc-400 transition-colors">
+          <div className="flex gap-1 items-end bg-zinc-50 border border-zinc-200 rounded-2xl px-2.5 py-2.5 focus-within:border-zinc-400 transition-colors">
             <textarea
-              className="flex-1 bg-transparent text-sm resize-none outline-none placeholder-zinc-400 min-h-[24px] max-h-[120px] text-zinc-800"
+              className="flex-1 bg-transparent text-sm resize-none outline-none placeholder-zinc-400 min-h-[24px] max-h-[120px] text-zinc-800 px-1.5"
               placeholder="Type a message..."
               value={input}
               onChange={(e) => { setInput(e.target.value); handleTyping(); }}
               onKeyDown={handleKeyDown}
+              maxLength={MAX_MESSAGE_LENGTH}
               rows={1}
             />
+            <EmojiPicker onSelect={(emoji) => setInput((v) => v + emoji)} />
             <button
               onClick={sendMessage}
               disabled={!input.trim()}
@@ -217,6 +225,13 @@ export function CustomerChat() {
               <Send size={13} />
             </button>
           </div>
+          {input.length > MAX_MESSAGE_LENGTH - 200 && (
+            <div className="text-right pr-1 mt-1">
+              <span className={`text-[11px] ${input.length >= MAX_MESSAGE_LENGTH ? "text-red-500" : "text-zinc-400"}`}>
+                {input.length}/{MAX_MESSAGE_LENGTH}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
