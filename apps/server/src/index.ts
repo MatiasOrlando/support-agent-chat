@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import conversationsRouter from "./routes/conversations";
+import { createConversationsRouter } from "./routes/conversations";
 import { registerSocketHandlers } from "./socket/handlers";
 
 const app = express();
@@ -20,7 +20,7 @@ app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:3000" }));
 app.use(express.json());
 
 // Routes
-app.use("/api/conversations", conversationsRouter);
+app.use("/api/conversations", createConversationsRouter(io));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });

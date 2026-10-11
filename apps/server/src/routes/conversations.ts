@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { Server } from "socket.io";
 import prisma from "../prisma";
 
-const router = Router();
+export function createConversationsRouter(io: Server) {
+  const router = Router();
 
 // GET all conversations (agent panel)
 router.get("/", async (_req, res) => {
@@ -58,10 +60,17 @@ router.patch("/:id/resolve", async (req, res) => {
       where: { id: req.params.id },
       data: { status: "RESOLVED" },
     });
+
+    io.to(conversation.id).emit("conversation_resolved", {
+      conversationId: conversation.id,
+    });
+    io.emit("conversation_updated", { conversationId: conversation.id });
+
     res.json(conversation);
   } catch (error) {
     res.status(500).json({ error: "Failed to resolve conversation" });
   }
 });
 
-export default router;
+  return router;
+}

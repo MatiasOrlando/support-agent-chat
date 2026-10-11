@@ -26,11 +26,16 @@ export function CustomerChat() {
     socket.on("new_message", (message: Message) => setMessages((prev) => [...prev, message]));
     socket.on("typing_start", ({ role }: { role: string }) => { if (role === "AGENT") setAgentTyping(true); });
     socket.on("typing_stop", ({ role }: { role: string }) => { if (role === "AGENT") setAgentTyping(false); });
+    socket.on("conversation_resolved", () => {
+      setIsResolved(true);
+      setAgentTyping(false);
+    });
     return () => {
       socket.off("agent_status");
       socket.off("new_message");
       socket.off("typing_start");
       socket.off("typing_stop");
+      socket.off("conversation_resolved");
       socket.disconnect();
     };
   }, []);
@@ -44,6 +49,8 @@ export function CustomerChat() {
     try {
       const conversation = await api.createConversation();
       setConversationId(conversation.id);
+      setIsResolved(false);
+      setMessages([]);
       socket.emit("join_conversation", conversation.id);
     } finally {
       setLoading(false);
